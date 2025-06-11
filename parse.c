@@ -11,6 +11,14 @@ void statement(void);
 // デバック用プリント
 // printf("tok.attr=%d, tok.value=%d\n",tok.attr, tok.value);
 
+// 記号表
+typedef struct
+{
+	int addr;
+	char v[MAXIDLEN + 1];
+} s_entry;
+s_entry s_table[32]; // 記号表の宣言
+
 void compiler(void)
 {
 	init_getsym();
@@ -61,11 +69,14 @@ void outblock(void)
 {
 	if (tok.attr == RWORD && tok.value == VAR)
 	{
+		int s_addr = 0; // 記号表に入れるアドレス
 		do
 		{
-			getsym(); // ident読み込み
+			getsym();
+			strcpy(s_table[s_addr].v, tok.charvalue); // 記号表へ登録
 
 			getsym();
+			s_addr++;
 		} while (tok.attr == SYMBOL && tok.value == COMMA);
 		while (tok.attr == SYMBOL && tok.value == SEMICOLON)
 		{
@@ -211,35 +222,44 @@ void expression(void)
 {
 	if (tok.attr == NUMBER)
 	{
+		fprintf(outfile, "loadi r0,%d\n", tok.value);
 	}
 	else if (tok.attr == IDENTIFIER)
 	{
+		fprintf(outfile, "loadi r0,%d\n", search_table(tok));
 	}
 	getsym();
 	if (tok.value == PLUS || tok.value == MINUS || tok.value == TIMES || tok.value == DIV)
 	{
 		int op = tok.value; // 演算子読み込み
 		getsym();			// 二つ目の数字読み取り
+
+		int second_num; // 式の第二項
 		if (tok.attr == NUMBER)
 		{
-			/* code */
+			second_num = tok.value;
 		}
 		else if (tok.attr == IDENTIFIER)
 		{
+			second_num = search_table(tok);
 		}
 
 		switch (op)
 		{
 		case PLUS:
+			fprintf(outfile, "addi r0,%d\n", second_num);
 			break;
 
 		case MINUS:
+			fprintf(outfile, "subi r0,%d\n", second_num);
 			break;
 
 		case TIMES:
+			fprintf(outfile, "muli r0,%d\n", second_num);
 			break;
 
 		case DIV:
+			fprintf(outfile, "divi r0,%d\n", second_num);
 			break;
 
 		default:
@@ -298,5 +318,21 @@ void condition(void)
 
 	default:
 		printf("比較でエラー\n");
+	}
+}
+
+int search_table(TOKEN tok)
+{
+	for (int i = 0; i < sizeof(s_table) / sizeof(s_entry); i++)
+	{
+		if (strcmp(tok.charvalue, s_table[0].v) == 0)
+		{
+			return tok.value;
+		}
+		else
+		{
+			print("そんな記号はありません: %c\n", tok.charvalue);
+			return -1;
+		}
 	}
 }
