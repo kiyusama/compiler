@@ -216,7 +216,7 @@ void expression(void)
 	{
 	}
 	getsym();
-	if (tok.attr == SYMBOL && (tok.value == PLUS || tok.value == MINUS || tok.value == TIMES || tok.value == DIV))
+	if (tok.value == PLUS || tok.value == MINUS || tok.value == TIMES || tok.value == DIV)
 	{
 		int op = tok.value; // 演算子読み込み
 		getsym();			// 二つ目の数字読み取り
