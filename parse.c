@@ -18,6 +18,7 @@ typedef struct
 	char v[MAXIDLEN + 1];
 } s_entry;
 s_entry s_table[32]; // 記号表の宣言
+int s_idx = 0;		 // 記号表登録に使うindex
 
 void compiler(void)
 {
@@ -69,14 +70,12 @@ void outblock(void)
 {
 	if (tok.attr == RWORD && tok.value == VAR)
 	{
-		int s_addr = 0; // 記号表に入れるアドレス
 		do
 		{
 			getsym();
-			strcpy(s_table[s_addr].v, tok.charvalue); // 記号表へ登録
+			register_table(tok); // 記号表へ登録
 
 			getsym();
-			s_addr++;
 		} while (tok.attr == SYMBOL && tok.value == COMMA);
 		while (tok.attr == SYMBOL && tok.value == SEMICOLON)
 		{
@@ -141,11 +140,13 @@ void statement(void)
 {
 	if (tok.attr == IDENTIFIER)
 	{
+		int addr = search_table(tok);
 		getsym();
 		if (tok.attr == SYMBOL && tok.value == BECOMES)
 		{
 			getsym();
 			expression();
+			fprintf(outfile, "store %d,r0\n", addr);
 		}
 		else
 		{
@@ -211,7 +212,9 @@ void statement(void)
 			getsym();
 			if (tok.attr == IDENTIFIER)
 			{
-				/* code */
+				fprintf(outfile, "writed %d\n", search_table(tok));
+				fprintf(outfile, "loadi r1,'\\n'\n");
+				fprintf(outfile, "writec r1\n");
 			}
 			getsym();
 		} while (tok.attr == SYMBOL && tok.value == COMMA);
@@ -226,51 +229,65 @@ void expression(void)
 	}
 	else if (tok.attr == IDENTIFIER)
 	{
-		fprintf(outfile, "loadi r0,%d\n", search_table(tok));
+		fprintf(outfile, "load r0,%d\n", search_table(tok));
 	}
 	getsym();
 	if (tok.value == PLUS || tok.value == MINUS || tok.value == TIMES || tok.value == DIV)
 	{
-		int op = tok.value; // 演算子読み込み
-		getsym();			// 二つ目の数字読み取り
-
-		int second_num; // 式の第二項
-		if (tok.attr == NUMBER)
+		int op = tok.value;		// 演算子読み込み
+		getsym();				// 二つ目の数字読み取り
+		if (tok.attr == NUMBER) // 数字の場合
 		{
-			second_num = tok.value;
+			switch (op)
+			{
+			case PLUS:
+				fprintf(outfile, "addi r0,%d\n", tok.value);
+				break;
+
+			case MINUS:
+				fprintf(outfile, "subi r0,%d\n", tok.value);
+				break;
+
+			case TIMES:
+				fprintf(outfile, "muli r0,%d\n", tok.value);
+				break;
+
+			case DIV:
+				fprintf(outfile, "divi r0,%d\n", tok.value);
+				break;
+
+			default:
+				printf("演算でエラー\n");
+			}
 		}
-		else if (tok.attr == IDENTIFIER)
+		else if (tok.attr == IDENTIFIER) // 変数の場合
 		{
-			second_num = search_table(tok);
-		}
+			int addr = search_table(tok);
+			switch (op)
+			{
+			case PLUS:
+				fprintf(outfile, "add r0,%d\n", addr);
+				break;
 
-		switch (op)
-		{
-		case PLUS:
-			fprintf(outfile, "addi r0,%d\n", second_num);
-			break;
+			case MINUS:
+				fprintf(outfile, "subi r0,%d\n", addr);
+				break;
 
-		case MINUS:
-			fprintf(outfile, "subi r0,%d\n", second_num);
-			break;
+			case TIMES:
+				fprintf(outfile, "muli r0,%d\n", addr);
+				break;
 
-		case TIMES:
-			fprintf(outfile, "muli r0,%d\n", second_num);
-			break;
+			case DIV:
+				fprintf(outfile, "divi r0,%d\n", addr);
+				break;
 
-		case DIV:
-			fprintf(outfile, "divi r0,%d\n", second_num);
-			break;
-
-		default:
-			printf("演算でエラー\n");
+			default:
+				printf("演算でエラー\n");
+			}
 		}
 		getsym();
 	}
-	else
-	{
-		return;
-	}
+	return;
 }
 
 void paramlist(void)
@@ -325,14 +342,17 @@ int search_table(TOKEN tok)
 {
 	for (int i = 0; i < sizeof(s_table) / sizeof(s_entry); i++)
 	{
-		if (strcmp(tok.charvalue, s_table[0].v) == 0)
+		if (strcmp(tok.charvalue, s_table[i].v) == 0)
 		{
-			return tok.value;
-		}
-		else
-		{
-			print("そんな記号はありません: %c\n", tok.charvalue);
-			return -1;
+			return s_table[i].addr;
 		}
 	}
+	printf("そんな変数はありません: %s\n", tok.charvalue);
+}
+
+void register_table(TOKEN tok)
+{
+	strcpy(s_table[s_idx].v, tok.charvalue);
+	s_table[s_idx].addr = s_idx;
+	s_idx++;
 }
